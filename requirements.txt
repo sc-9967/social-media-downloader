@@ -1,0 +1,5 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+yt-dlp>=2026.10.26
+gallery-dl>=1.32
+imageio-ffmpeg>=0.5

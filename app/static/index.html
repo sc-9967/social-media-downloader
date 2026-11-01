@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Social Media Downloader</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --card: #ffffff; --text: #1c1f24; --muted: #5d6470;
+      --accent: #2f6fed; --accent-hover: #2459c4; --border: #d9dde3;
+      --error: #c62828; --ok: #2e7d32;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #14161a; --card: #1d2026; --text: #e8eaee; --muted: #9aa2ae;
+        --accent: #5b8cff; --accent-hover: #7aa2ff; --border: #343a44;
+        --error: #ff6b6b; --ok: #6fcf75;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      background: var(--bg); color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      padding: 16px;
+    }
+    main {
+      width: 100%; max-width: 560px; background: var(--card);
+      border: 1px solid var(--border); border-radius: 12px; padding: 28px;
+    }
+    h1 { margin: 0 0 4px; font-size: 1.4rem; }
+    p.sub { margin: 0 0 20px; color: var(--muted); font-size: .95rem; }
+    form { display: flex; gap: 8px; flex-wrap: wrap; }
+    input {
+      flex: 1 1 280px; padding: 12px 14px; font-size: 1rem; color: var(--text);
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    }
+    input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    button {
+      flex: 0 0 auto; padding: 12px 20px; font-size: 1rem; font-weight: 600;
+      color: #fff; background: var(--accent); border: 0; border-radius: 8px; cursor: pointer;
+    }
+    button:hover:not(:disabled) { background: var(--accent-hover); }
+    button:disabled { opacity: .6; cursor: wait; }
+    #status { margin: 16px 0 0; min-height: 1.5em; font-size: .95rem; }
+    #status.error { color: var(--error); }
+    #status.ok { color: var(--ok); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Social Media Downloader</h1>
+    <p class="sub">Incolla il link di un post pubblico di TikTok, Instagram o Facebook.</p>
+    <form id="form">
+      <label for="url" hidden>Link del post</label>
+      <input id="url" type="url" required placeholder="https://www.tiktok.com/@utente/video/..." autocomplete="off">
+      <button id="btn" type="submit">Scarica</button>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+  <script>
+    const form = document.getElementById("form");
+    const input = document.getElementById("url");
+    const btn = document.getElementById("btn");
+    const status = document.getElementById("status");
+
+    function setStatus(text, kind = "") {
+      status.textContent = text;
+      status.className = kind;
+    }
+
+    function filenameFrom(response) {
+      const cd = response.headers.get("Content-Disposition") || "";
+      const utf8 = cd.match(/filename\*=utf-8''([^;]+)/i);
+      if (utf8) return decodeURIComponent(utf8[1]);
+      const plain = cd.match(/filename="?([^";]+)"?/i);
+      return plain ? plain[1] : "download";
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      btn.disabled = true;
+      setStatus("Download in corso…");
+      try {
+        const res = await fetch("/api/download", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: input.value }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          const detail = typeof data.detail === "string" ? data.detail : "Errore durante il download.";
+          throw new Error(detail);
+        }
+        const blob = await res.blob();
+        const name = filenameFrom(res);
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        setStatus(`Fatto: ${name}`, "ok");
+      } catch (err) {
+        setStatus(err.message, "error");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
