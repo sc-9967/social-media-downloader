@@ -51,14 +51,10 @@
       display: flex; align-items: center; gap: 8px;
       font-size: .95rem; color: var(--muted); cursor: pointer;
     }
-    .brand {
-      flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
-    }
     .watermark {
-      height: 64px; width: auto; opacity: .3;
+      flex: none; height: 64px; width: auto; opacity: .3;
       pointer-events: none; user-select: none;
     }
-    .owner { font-size: .68rem; color: var(--muted); opacity: .7; }
     @media (prefers-color-scheme: dark) {
       .watermark { opacity: .45; }
     }
@@ -82,10 +78,7 @@
         <input id="reduce" type="checkbox">
         Riduci ogni file a massimo 9,9 MB
       </label>
-      <div class="brand">
-        <img class="watermark" src="logo.png" alt="" aria-hidden="true">
-        <small class="owner">© Proprietà di Silvio Chiaverini</small>
-      </div>
+      <img class="watermark" src="logo.png" alt="" aria-hidden="true">
     </div>
     <p id="status" role="status" aria-live="polite"></p>
   </main>
