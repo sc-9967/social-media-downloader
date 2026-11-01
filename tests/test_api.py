@@ -18,6 +18,8 @@ client = TestClient(app)
         "https://www.instagram.com/p/abc/",
         "https://www.facebook.com/watch/?v=1",
         "https://fb.watch/abc/",
+        "https://www.snapchat.com/spotlight/abc",
+        "https://t.me/channel/613",
     ],
 )
 def test_validate_url_accepts_supported_sites(url):
@@ -32,6 +34,8 @@ def test_validate_url_accepts_supported_sites(url):
         "https://www.youtube.com/watch?v=1",
         "https://eviltiktok.com/x",
         "https://tiktok.com.evil.com/x",
+        "https://www.threads.com/@user/post/abc",
+        "https://evilt.me/x",
         "http://127.0.0.1:8000/",
     ],
 )
@@ -121,6 +125,41 @@ def test_both_downloaders_fail(monkeypatch):
     res = client.post("/api/download", json={"url": "https://www.facebook.com/x"})
     assert res.status_code == 422
     assert "Unsupported URL" in res.json()["detail"]
+
+
+def test_telegram_photos_from_embed_widget(monkeypatch, tmp_path):
+    embed = (
+        "<a class=\"tgme_widget_message_photo_wrap 1\" style=\"width:800px;"
+        "background-image:url('https://cdn4.telesco.pe/file/a.jpg')\"></a>"
+        "<a class=\"tgme_widget_message_photo_wrap 2\" style=\"background-image:url('https://cdn4.telesco.pe/file/b.jpg')\"></a>"
+    )
+    responses = {
+        "https://t.me/canale/605?embed=1": embed.encode(),
+        "https://cdn4.telesco.pe/file/a.jpg": b"A",
+        "https://cdn4.telesco.pe/file/b.jpg": b"B",
+    }
+
+    class FakeResponse:
+        def __init__(self, body):
+            self.body = body
+
+        def read(self):
+            return self.body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(downloader.urllib.request, "urlopen", lambda url, timeout: FakeResponse(responses[url]))
+    downloader._download_telegram_photos("https://t.me/canale/605", tmp_path)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["telegram_605_1.jpg", "telegram_605_2.jpg"]
+
+
+def test_telegram_photos_ignores_other_sites(tmp_path):
+    downloader._download_telegram_photos("https://www.instagram.com/p/abc/", tmp_path)
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_login_required_gets_friendly_message(monkeypatch):

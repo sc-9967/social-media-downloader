@@ -1,8 +1,17 @@
 # Social Media Downloader
 
 Piccola applicazione web da avviare sul proprio computer: incolli il link di un post
-pubblico di **TikTok**, **Instagram** o **Facebook** e il browser scarica il video o
-le immagini. Se il post contiene più elementi (carosello, slideshow) ricevi uno ZIP.
+pubblico di **TikTok**, **Instagram**, **Facebook**, **Snapchat** o **Telegram** e il
+browser scarica il video o le immagini. Se il post contiene più elementi (carosello,
+slideshow, album) ricevi uno ZIP.
+
+| Piattaforma | Cosa funziona |
+|---|---|
+| TikTok | Video e slideshow pubblici (vedi i limiti sotto) |
+| Instagram | Post e reel pubblici |
+| Facebook | Video pubblici |
+| Snapchat | Spotlight e storie pubbliche dei profili |
+| Telegram | Video e foto dei post di canali pubblici (link `t.me/canale/123`) |
 
 Spuntando **Riduci ogni file a massimo 9,9 MB**, ogni video o immagine più grande
 viene compresso fino a stare sotto 9.900.000 byte (vale per ciascun file, anche
@@ -12,6 +21,7 @@ molto lungo può non entrare nel limite: in quel caso compare un errore.
 
 Sotto il cofano usa [yt-dlp](https://github.com/yt-dlp/yt-dlp) per i video e
 [gallery-dl](https://github.com/mikf/gallery-dl) come ripiego per i post di sole immagini.
+Le foto di Telegram vengono lette dal widget pubblico di incorporamento del post.
 
 ## Requisiti
 
@@ -47,6 +57,10 @@ docker run --rm -p 8000:8000 social-media-downloader
   l'accesso, compare un messaggio di errore.
 - **TikTok** al momento può rimandare alla pagina di login anche per video pubblici,
   a seconda della rete e della regione: in quel caso il download non riesce.
+- **Telegram:** solo canali pubblici. Chat, gruppi privati e canali privati non sono
+  raggiungibili senza un account.
+- **Threads e WhatsApp non sono supportati:** Threads non mostra i media dei post
+  senza login, e le storie di WhatsApp non hanno un link pubblico.
 - Le piattaforme cambiano spesso il loro funzionamento. Se i download smettono di
   funzionare, aggiorna i motori di estrazione:
 
@@ -73,7 +87,4 @@ ne viene fatto.
 
 ## Licenza
 
-Il codice è distribuito con licenza [MIT](LICENSE). © 2026 Silvio Chiaverini.
-
-Il logo (`app/static/logo.png`) è proprietà di Silvio Chiaverini e **non** è coperto
-dalla licenza MIT: non può essere riutilizzato senza autorizzazione.
+[MIT](LICENSE)

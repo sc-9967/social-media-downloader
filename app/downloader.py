@@ -1,12 +1,14 @@
-"""Download di video e immagini da TikTok, Instagram e Facebook.
+"""Download di video e immagini da TikTok, Instagram, Facebook, Snapchat e Telegram.
 
 Strategia: prima yt-dlp (ottimo per i video), poi gallery-dl come ripiego
 (gestisce i post con sole immagini, i caroselli e le slideshow di TikTok).
 """
 
+import re
 import shutil
 import subprocess
 import sys
+import urllib.request
 import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
@@ -15,9 +17,16 @@ import yt_dlp
 
 from app import compress
 
-ALLOWED_DOMAINS = ("tiktok.com", "instagram.com", "facebook.com", "fb.watch", "fb.com")
+ALLOWED_DOMAINS = (
+    "tiktok.com", "instagram.com", "facebook.com", "fb.watch", "fb.com",
+    "snapchat.com", "t.me", "telegram.me",
+)
+
+TELEGRAM_DOMAINS = ("t.me", "telegram.me")
+TELEGRAM_PHOTO = re.compile(r"tgme_widget_message_photo_wrap[^>]*?background-image:url\('([^']+)'\)")
 
 GALLERY_DL_TIMEOUT = 300
+HTTP_TIMEOUT = 30
 
 
 class DownloadError(Exception):
@@ -31,7 +40,7 @@ def validate_url(url: str) -> str:
     if parsed.scheme not in ("http", "https") or not host:
         raise DownloadError("Inserisci un indirizzo valido che inizi con http:// o https://")
     if not any(host == d or host.endswith("." + d) for d in ALLOWED_DOMAINS):
-        raise DownloadError("Sono supportati solo link di TikTok, Instagram e Facebook.")
+        raise DownloadError("Sono supportati solo link di TikTok, Instagram, Facebook, Snapchat e Telegram.")
     return url
 
 
@@ -78,6 +87,23 @@ def _download_with_gallerydl(url: str, dest: Path) -> None:
         raise DownloadError(result.stderr.strip() or "gallery-dl non è riuscito a scaricare il contenuto.")
 
 
+def _download_telegram_photos(url: str, dest: Path) -> None:
+    # yt-dlp prende solo i video di Telegram: le foto si leggono dal widget
+    # pubblico di incorporamento del post.
+    parsed = urlparse(url)
+    if (parsed.hostname or "").lower() not in TELEGRAM_DOMAINS:
+        return
+    embed_url = f"https://t.me{parsed.path}?embed=1"
+    with urllib.request.urlopen(embed_url, timeout=HTTP_TIMEOUT) as resp:
+        html = resp.read().decode("utf-8", "replace")
+    post_id = parsed.path.rstrip("/").rsplit("/", 1)[-1]
+    for n, photo_url in enumerate(TELEGRAM_PHOTO.findall(html), 1):
+        if urlparse(photo_url).scheme != "https":
+            continue
+        with urllib.request.urlopen(photo_url, timeout=HTTP_TIMEOUT) as resp:
+            (dest / f"telegram_{post_id}_{n}.jpg").write_bytes(resp.read())
+
+
 def _media_files(dest: Path) -> list[Path]:
     return sorted(p for p in dest.rglob("*") if p.is_file() and not p.name.endswith((".part", ".ytdl")))
 
@@ -88,14 +114,16 @@ def download(url: str, dest: Path, max_size: int | None = None) -> Path:
     Con `max_size` ogni file viene compresso fino a stare in quel numero di byte."""
     url = validate_url(url)
     errors = []
-    for fetch in (_download_with_ytdlp, _download_with_gallerydl):
+    for fetch in (_download_with_ytdlp, _download_with_gallerydl, _download_telegram_photos):
         try:
             fetch(url, dest)
-        except (yt_dlp.utils.DownloadError, DownloadError, subprocess.TimeoutExpired) as exc:
+        except (yt_dlp.utils.DownloadError, DownloadError, subprocess.TimeoutExpired, OSError) as exc:
             errors.append(str(exc))
         files = _media_files(dest)
         if files:
             break
+        if not errors:
+            errors.append("nel post non c'è nessun video o immagine (forse è stato eliminato).")
     else:
         if any("login" in e.lower() for e in errors):
             raise DownloadError(
