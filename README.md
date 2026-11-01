@@ -73,4 +73,7 @@ ne viene fatto.
 
 ## Licenza
 
-[MIT](LICENSE)
+Il codice è distribuito con licenza [MIT](LICENSE). © 2026 Silvio Chiaverini.
+
+Il logo (`app/static/logo.png`) è proprietà di Silvio Chiaverini e **non** è coperto
+dalla licenza MIT: non può essere riutilizzato senza autorizzazione.
