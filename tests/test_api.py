@@ -63,6 +63,37 @@ def test_single_file_is_returned(monkeypatch):
     assert "video.mp4" in res.headers["content-disposition"]
 
 
+def test_reduce_flag_compresses_each_file(monkeypatch):
+    def fake_ytdlp(url, dest):
+        (dest / "1.mp4").write_bytes(b"a")
+        (dest / "2.mp4").write_bytes(b"b")
+
+    calls = []
+
+    def fake_fit(path, max_size):
+        calls.append((path.name, max_size))
+        return path
+
+    monkeypatch.setattr(downloader, "_download_with_ytdlp", fake_ytdlp)
+    monkeypatch.setattr(downloader.compress, "fit", fake_fit)
+    res = client.post("/api/download", json={"url": "https://www.tiktok.com/@u/video/1", "reduce": True})
+    assert res.status_code == 200
+    assert calls == [("1.mp4", 9_900_000), ("2.mp4", 9_900_000)]
+
+
+def test_without_reduce_flag_nothing_is_compressed(monkeypatch):
+    def fake_ytdlp(url, dest):
+        (dest / "video.mp4").write_bytes(b"video")
+
+    def fail_fit(path, max_size):
+        raise AssertionError("non doveva comprimere")
+
+    monkeypatch.setattr(downloader, "_download_with_ytdlp", fake_ytdlp)
+    monkeypatch.setattr(downloader.compress, "fit", fail_fit)
+    res = client.post("/api/download", json={"url": "https://www.tiktok.com/@u/video/1"})
+    assert res.status_code == 200
+
+
 def test_fallback_to_gallerydl_and_zip(monkeypatch, tmp_path):
     def failing_ytdlp(url, dest):
         raise downloader.yt_dlp.utils.DownloadError("There is no video in this post")

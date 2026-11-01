@@ -4,6 +4,12 @@ Piccola applicazione web da avviare sul proprio computer: incolli il link di un 
 pubblico di **TikTok**, **Instagram** o **Facebook** e il browser scarica il video o
 le immagini. Se il post contiene più elementi (carosello, slideshow) ricevi uno ZIP.
 
+Spuntando **Riduci ogni file a massimo 9,9 MB**, ogni video o immagine più grande
+viene compresso fino a stare sotto 9.900.000 byte (vale per ciascun file, anche
+dentro lo ZIP). I video vengono ricodificati in H.264 abbassando bitrate e, se serve,
+risoluzione; le immagini vengono convertite in JPEG e ridimensionate. Un video
+molto lungo può non entrare nel limite: in quel caso compare un errore.
+
 Sotto il cofano usa [yt-dlp](https://github.com/yt-dlp/yt-dlp) per i video e
 [gallery-dl](https://github.com/mikf/gallery-dl) come ripiego per i post di sole immagini.
 

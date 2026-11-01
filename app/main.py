@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
+from app.compress import MAX_SIZE
 from app.downloader import DownloadError, download
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -17,13 +18,14 @@ app = FastAPI(title="Social Media Downloader")
 
 class DownloadRequest(BaseModel):
     url: str
+    reduce: bool = False
 
 
 @app.post("/api/download")
 def api_download(req: DownloadRequest):
     tmp = Path(tempfile.mkdtemp(prefix="smd_"))
     try:
-        file = download(req.url, tmp)
+        file = download(req.url, tmp, MAX_SIZE if req.reduce else None)
     except DownloadError as exc:
         shutil.rmtree(tmp, ignore_errors=True)
         raise HTTPException(status_code=422, detail=str(exc))

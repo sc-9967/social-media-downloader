@@ -13,6 +13,8 @@ from urllib.parse import urlparse
 
 import yt_dlp
 
+from app import compress
+
 ALLOWED_DOMAINS = ("tiktok.com", "instagram.com", "facebook.com", "fb.watch", "fb.com")
 
 GALLERY_DL_TIMEOUT = 300
@@ -80,9 +82,10 @@ def _media_files(dest: Path) -> list[Path]:
     return sorted(p for p in dest.rglob("*") if p.is_file() and not p.name.endswith((".part", ".ytdl")))
 
 
-def download(url: str, dest: Path) -> Path:
+def download(url: str, dest: Path, max_size: int | None = None) -> Path:
     """Scarica il contenuto di `url` in `dest` e restituisce il file da inviare
-    (il file singolo oppure uno ZIP se il post contiene più elementi)."""
+    (il file singolo oppure uno ZIP se il post contiene più elementi).
+    Con `max_size` ogni file viene compresso fino a stare in quel numero di byte."""
     url = validate_url(url)
     errors = []
     for fetch in (_download_with_ytdlp, _download_with_gallerydl):
@@ -101,6 +104,12 @@ def download(url: str, dest: Path) -> Path:
             )
         detail = errors[0] if errors else "nessun file trovato"
         raise DownloadError(f"Impossibile scaricare il contenuto: {detail}")
+
+    if max_size:
+        try:
+            files = [compress.fit(f, max_size) for f in files]
+        except (compress.CompressionError, subprocess.TimeoutExpired) as exc:
+            raise DownloadError(str(exc))
 
     if len(files) == 1:
         return files[0]
