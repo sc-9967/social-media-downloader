@@ -20,6 +20,11 @@ client = TestClient(app)
         "https://fb.watch/abc/",
         "https://www.snapchat.com/spotlight/abc",
         "https://t.me/channel/613",
+        "https://www.youtube.com/watch?v=Yil32mThG04",
+        "https://www.youtube.com/watch?v=Yil32mThG04&list=PLx",
+        "https://m.youtube.com/watch?v=Yil32mThG04",
+        "https://www.youtube.com/shorts/abc123",
+        "https://youtu.be/Yil32mThG04",
     ],
 )
 def test_validate_url_accepts_supported_sites(url):
@@ -31,11 +36,13 @@ def test_validate_url_accepts_supported_sites(url):
     [
         "not a url",
         "ftp://www.tiktok.com/x",
-        "https://www.youtube.com/watch?v=1",
+        "https://vimeo.com/123",
         "https://eviltiktok.com/x",
         "https://tiktok.com.evil.com/x",
         "https://www.threads.com/@user/post/abc",
         "https://evilt.me/x",
+        "https://www.youtube.com/@YouTube/videos",
+        "https://www.youtube.com/playlist?list=PLx",
         "http://127.0.0.1:8000/",
     ],
 )

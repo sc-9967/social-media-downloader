@@ -1,4 +1,4 @@
-"""Download di video e immagini da TikTok, Instagram, Facebook, Snapchat e Telegram.
+"""Download di video e immagini da TikTok, Instagram, Facebook, Snapchat, Telegram e YouTube.
 
 Strategia: prima yt-dlp (ottimo per i video), poi gallery-dl come ripiego
 (gestisce i post con sole immagini, i caroselli e le slideshow di TikTok).
@@ -19,8 +19,11 @@ from app import compress
 
 ALLOWED_DOMAINS = (
     "tiktok.com", "instagram.com", "facebook.com", "fb.watch", "fb.com",
-    "snapchat.com", "t.me", "telegram.me",
+    "snapchat.com", "t.me", "telegram.me", "youtube.com", "youtu.be",
 )
+
+YOUTUBE_DOMAINS = ("youtube.com", "youtu.be")
+YOUTUBE_SINGLE_VIDEO = re.compile(r"^/(watch|shorts/[\w-]+|live/[\w-]+)/?$")
 
 TELEGRAM_DOMAINS = ("t.me", "telegram.me")
 TELEGRAM_PHOTO = re.compile(r"tgme_widget_message_photo_wrap[^>]*?background-image:url\('([^']+)'\)")
@@ -40,8 +43,16 @@ def validate_url(url: str) -> str:
     if parsed.scheme not in ("http", "https") or not host:
         raise DownloadError("Inserisci un indirizzo valido che inizi con http:// o https://")
     if not any(host == d or host.endswith("." + d) for d in ALLOWED_DOMAINS):
-        raise DownloadError("Sono supportati solo link di TikTok, Instagram, Facebook, Snapchat e Telegram.")
+        raise DownloadError(
+            "Sono supportati solo link di TikTok, Instagram, Facebook, Snapchat, Telegram e YouTube."
+        )
+    if _is_youtube(host) and not (host.endswith("youtu.be") or YOUTUBE_SINGLE_VIDEO.match(parsed.path)):
+        raise DownloadError("Per YouTube incolla il link di un singolo video o Short, non di playlist o canali.")
     return url
+
+
+def _is_youtube(host: str) -> bool:
+    return any(host == d or host.endswith("." + d) for d in YOUTUBE_DOMAINS)
 
 
 def _ffmpeg_location() -> str | None:
@@ -55,13 +66,26 @@ def _ffmpeg_location() -> str | None:
         return None
 
 
+def _deno_path() -> str | None:
+    # YouTube richiede di risolvere una sfida JavaScript: yt-dlp usa Deno,
+    # installato come pacchetto pip.
+    try:
+        import deno
+
+        return deno.find_deno_bin()
+    except Exception:
+        return shutil.which("deno")
+
+
 def _download_with_ytdlp(url: str, dest: Path) -> None:
     opts = {
         "outtmpl": str(dest / "%(extractor)s_%(id)s.%(ext)s"),
         "restrictfilenames": True,
-        "format": "bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b",
+        # Massimo 1080p: oltre i file diventano enormi senza vantaggi per i social.
+        "format": "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/b",
         "merge_output_format": "mp4",
-        "noplaylist": False,
+        # Su YouTube un link watch?v=...&list=... deve scaricare solo il video.
+        "noplaylist": _is_youtube((urlparse(url).hostname or "").lower()),
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
@@ -70,6 +94,9 @@ def _download_with_ytdlp(url: str, dest: Path) -> None:
     ffmpeg = _ffmpeg_location()
     if ffmpeg:
         opts["ffmpeg_location"] = ffmpeg
+    deno_bin = _deno_path()
+    if deno_bin:
+        opts["js_runtimes"] = {"deno": {"path": deno_bin}}
     with yt_dlp.YoutubeDL(opts) as ydl:
         ydl.download([url])
 
