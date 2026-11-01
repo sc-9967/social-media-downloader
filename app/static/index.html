@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="author" content="Silvio Chiaverini">
   <title>Social Media Downloader</title>
   <style>
     :root {
@@ -50,10 +51,14 @@
       display: flex; align-items: center; gap: 8px;
       font-size: .95rem; color: var(--muted); cursor: pointer;
     }
+    .brand {
+      flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+    }
     .watermark {
-      flex: none; height: 64px; width: auto; opacity: .3;
+      height: 64px; width: auto; opacity: .3;
       pointer-events: none; user-select: none;
     }
+    .owner { font-size: .68rem; color: var(--muted); opacity: .7; }
     @media (prefers-color-scheme: dark) {
       .watermark { opacity: .45; }
     }
@@ -77,7 +82,10 @@
         <input id="reduce" type="checkbox">
         Riduci ogni file a massimo 9,9 MB
       </label>
-      <img class="watermark" src="logo.png" alt="" aria-hidden="true">
+      <div class="brand">
+        <img class="watermark" src="logo.png" alt="" aria-hidden="true">
+        <small class="owner">© Proprietà di Silvio Chiaverini</small>
+      </div>
     </div>
     <p id="status" role="status" aria-live="polite"></p>
   </main>
