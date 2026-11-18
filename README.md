@@ -54,10 +54,39 @@ docker build -t social-media-downloader .
 docker run --rm -p 8000:8000 social-media-downloader
 ```
 
+## Contenuti che richiedono il login (facoltativo)
+
+Di serie l'app scarica come un utente anonimo: l'accesso fatto nel browser non
+conta, perché il download lo fa il programma, non il browser. Se Instagram, TikTok
+o un'altra piattaforma chiedono il login, puoi far usare all'app i cookie del tuo
+browser, cioè la sessione con cui sei già entrato.
+
+**Con un file `cookies.txt`** (consigliato, l'unico modo affidabile con Chrome):
+
+1. Nel browser entra nel sito (per esempio instagram.com).
+2. Esporta i cookie in formato Netscape `cookies.txt` con un'estensione che lavora
+   in locale, per esempio *Get cookies.txt LOCALLY*. Diffida di estensioni simili che
+   inviano i cookie a server esterni.
+3. Salva il file come `cookies.txt` nella cartella del progetto (accanto a questo
+   README) e riavvia l'app. In alternativa indica un altro percorso con la variabile
+   d'ambiente `SMD_COOKIES_FILE`.
+
+**Direttamente dal browser**: imposta `SMD_COOKIES_FROM_BROWSER=firefox` (oppure
+`edge`, `brave`, `chrome`…). Con Chrome su Windows di solito non funziona, perché
+Chrome blocca la lettura dei cookie da parte di altri programmi.
+
+Da sapere:
+
+- Il file `cookies.txt` dà accesso al tuo account: tienilo solo sul tuo PC.
+  È escluso da git (`.gitignore`), non caricarlo altrove.
+- I download fatti con il tuo account possono attirare controlli della piattaforma
+  (verifiche, limitazioni temporanee). Meglio non scaricarne molti di fila.
+- Quando la sessione scade, riesporta il file.
+
 ## Limiti noti
 
-- **Solo contenuti pubblici.** L'app non usa il login. Se la piattaforma chiede
-  l'accesso, compare un messaggio di errore.
+- **Senza cookie, solo contenuti pubblici.** Se la piattaforma chiede l'accesso,
+  compare un messaggio di errore (vedi la sezione sopra).
 - **TikTok** al momento può rimandare alla pagina di login anche per video pubblici,
   a seconda della rete e della regione: in quel caso il download non riesce.
 - **Telegram:** solo canali pubblici. Chat, gruppi privati e canali privati non sono

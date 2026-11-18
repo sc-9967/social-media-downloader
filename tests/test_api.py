@@ -1,3 +1,4 @@
+import subprocess
 import zipfile
 
 import pytest
@@ -8,6 +9,14 @@ from app.downloader import DownloadError, validate_url
 from app.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def no_cookies(monkeypatch, tmp_path):
+    # I test non devono dipendere da un cookies.txt o da variabili sul PC di chi li lancia.
+    monkeypatch.delenv("SMD_COOKIES_FILE", raising=False)
+    monkeypatch.delenv("SMD_COOKIES_FROM_BROWSER", raising=False)
+    monkeypatch.setattr(downloader, "DEFAULT_COOKIES_FILE", tmp_path / "assente.txt")
 
 
 @pytest.mark.parametrize(
@@ -167,6 +176,60 @@ def test_telegram_photos_from_embed_widget(monkeypatch, tmp_path):
 def test_telegram_photos_ignores_other_sites(tmp_path):
     downloader._download_telegram_photos("https://www.instagram.com/p/abc/", tmp_path)
     assert list(tmp_path.iterdir()) == []
+
+
+def test_cookies_disabled_by_default():
+    assert downloader._cookies() == (None, None)
+
+
+def test_cookies_file_beats_browser(monkeypatch, tmp_path):
+    default = tmp_path / "cookies.txt"
+    default.write_text("# Netscape HTTP Cookie File\n")
+    monkeypatch.setattr(downloader, "DEFAULT_COOKIES_FILE", default)
+    monkeypatch.setenv("SMD_COOKIES_FROM_BROWSER", "firefox")
+    assert downloader._cookies() == (str(default), None)
+    monkeypatch.setenv("SMD_COOKIES_FILE", "altro.txt")
+    assert downloader._cookies() == ("altro.txt", None)
+
+
+def test_cookies_reach_both_downloaders(monkeypatch, tmp_path):
+    monkeypatch.setenv("SMD_COOKIES_FROM_BROWSER", "Firefox")
+    captured = {}
+
+    class FakeYDL:
+        def __init__(self, opts):
+            captured["opts"] = opts
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def download(self, urls):
+            pass
+
+    def fake_run(args, **kwargs):
+        captured["args"] = args
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(downloader.yt_dlp, "YoutubeDL", FakeYDL)
+    monkeypatch.setattr(downloader.subprocess, "run", fake_run)
+    downloader._download_with_ytdlp("https://www.instagram.com/p/abc/", tmp_path)
+    downloader._download_with_gallerydl("https://www.instagram.com/p/abc/", tmp_path)
+    assert captured["opts"]["cookiesfrombrowser"] == ("firefox",)
+    assert captured["args"][captured["args"].index("--cookies-from-browser") + 1] == "firefox"
+
+
+def test_unreadable_browser_cookies_get_clear_message(monkeypatch):
+    def failing(url, dest):
+        raise DownloadError("ERROR: Could not copy Chrome cookie database.")
+
+    monkeypatch.setattr(downloader, "_download_with_ytdlp", failing)
+    monkeypatch.setattr(downloader, "_download_with_gallerydl", failing)
+    res = client.post("/api/download", json={"url": "https://www.instagram.com/p/abc/"})
+    assert res.status_code == 422
+    assert "cookies.txt" in res.json()["detail"]
 
 
 def test_login_required_gets_friendly_message(monkeypatch):

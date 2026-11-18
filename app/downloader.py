@@ -4,6 +4,7 @@ Strategia: prima yt-dlp (ottimo per i video), poi gallery-dl come ripiego
 (gestisce i post con sole immagini, i caroselli e le slideshow di TikTok).
 """
 
+import os
 import re
 import shutil
 import subprocess
@@ -30,6 +31,9 @@ TELEGRAM_PHOTO = re.compile(r"tgme_widget_message_photo_wrap[^>]*?background-ima
 
 GALLERY_DL_TIMEOUT = 300
 HTTP_TIMEOUT = 30
+
+# File cookies.txt usato in automatico se presente nella cartella del progetto.
+DEFAULT_COOKIES_FILE = Path(__file__).resolve().parent.parent / "cookies.txt"
 
 
 class DownloadError(Exception):
@@ -77,6 +81,19 @@ def _deno_path() -> str | None:
         return shutil.which("deno")
 
 
+def _cookies() -> tuple[str | None, str | None]:
+    """Accesso facoltativo con il proprio account, per i contenuti che richiedono
+    il login: restituisce (file cookies.txt, nome del browser), al massimo uno dei due.
+    Disattivato se non c'è né SMD_COOKIES_FILE, né cookies.txt, né SMD_COOKIES_FROM_BROWSER."""
+    cookies_file = os.environ.get("SMD_COOKIES_FILE", "").strip()
+    if cookies_file:
+        return cookies_file, None
+    if DEFAULT_COOKIES_FILE.is_file():
+        return str(DEFAULT_COOKIES_FILE), None
+    browser = os.environ.get("SMD_COOKIES_FROM_BROWSER", "").strip().lower()
+    return None, browser or None
+
+
 def _download_with_ytdlp(url: str, dest: Path) -> None:
     opts = {
         "outtmpl": str(dest / "%(extractor)s_%(id)s.%(ext)s"),
@@ -97,6 +114,11 @@ def _download_with_ytdlp(url: str, dest: Path) -> None:
     deno_bin = _deno_path()
     if deno_bin:
         opts["js_runtimes"] = {"deno": {"path": deno_bin}}
+    cookies_file, browser = _cookies()
+    if cookies_file:
+        opts["cookiefile"] = cookies_file
+    elif browser:
+        opts["cookiesfrombrowser"] = (browser,)
     with yt_dlp.YoutubeDL(opts) as ydl:
         ydl.download([url])
 
@@ -104,8 +126,14 @@ def _download_with_ytdlp(url: str, dest: Path) -> None:
 def _download_with_gallerydl(url: str, dest: Path) -> None:
     # Processo separato: la configurazione di gallery-dl è globale e non va
     # condivisa tra richieste concorrenti.
+    cookies_file, browser = _cookies()
+    cookie_args = (
+        ["--cookies", cookies_file] if cookies_file
+        else ["--cookies-from-browser", browser] if browser
+        else []
+    )
     result = subprocess.run(
-        [sys.executable, "-m", "gallery_dl", "--quiet", "-D", str(dest), url],
+        [sys.executable, "-m", "gallery_dl", "--quiet", *cookie_args, "-D", str(dest), url],
         capture_output=True,
         text=True,
         timeout=GALLERY_DL_TIMEOUT,
@@ -152,10 +180,20 @@ def download(url: str, dest: Path, max_size: int | None = None) -> Path:
         if not errors:
             errors.append("nel post non c'è nessun video o immagine (forse è stato eliminato).")
     else:
-        if any("login" in e.lower() for e in errors):
+        if any("cookie" in e.lower() and "database" in e.lower() for e in errors):
             raise DownloadError(
-                "La piattaforma richiede il login per vedere questo contenuto, "
-                "quindi senza accesso non è scaricabile."
+                "Non riesco a leggere i cookie del browser (con Chrome capita spesso): "
+                "usa un file cookies.txt, come spiegato nel README."
+            )
+        if any("login" in e.lower() for e in errors):
+            if any(_cookies()):
+                raise DownloadError(
+                    "La piattaforma richiede il login anche con i cookie configurati: "
+                    "controlla di essere entrato con quel browser e che i cookie siano recenti."
+                )
+            raise DownloadError(
+                "La piattaforma richiede il login per vedere questo contenuto. "
+                "Per scaricarlo con il tuo account configura i cookie del browser (vedi README)."
             )
         detail = errors[0] if errors else "nessun file trovato"
         raise DownloadError(f"Impossibile scaricare il contenuto: {detail}")
