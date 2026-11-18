@@ -73,7 +73,9 @@ browser, cioè la sessione con cui sei già entrato.
 
 **Direttamente dal browser**: imposta `SMD_COOKIES_FROM_BROWSER=firefox` (oppure
 `edge`, `brave`, `chrome`…). Con Chrome su Windows di solito non funziona, perché
-Chrome blocca la lettura dei cookie da parte di altri programmi.
+Chrome blocca la lettura dei cookie da parte di altri programmi. Con Firefox, dopo
+aver fatto l'accesso chiudi Firefox una volta: finché resta aperto tiene il login
+appena fatto in un file temporaneo che l'app non vede.
 
 Da sapere:
 

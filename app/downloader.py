@@ -189,7 +189,8 @@ def download(url: str, dest: Path, max_size: int | None = None) -> Path:
             if any(_cookies()):
                 raise DownloadError(
                     "La piattaforma richiede il login anche con i cookie configurati: "
-                    "controlla di essere entrato con quel browser e che i cookie siano recenti."
+                    "controlla di essere entrato con quel browser e che i cookie siano recenti. "
+                    "Se hai appena fatto l'accesso con Firefox, chiudilo una volta e riprova."
                 )
             raise DownloadError(
                 "La piattaforma richiede il login per vedere questo contenuto. "
