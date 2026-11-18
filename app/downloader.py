@@ -163,9 +163,8 @@ def _media_files(dest: Path) -> list[Path]:
     return sorted(p for p in dest.rglob("*") if p.is_file() and not p.name.endswith((".part", ".ytdl")))
 
 
-def download(url: str, dest: Path, max_size: int | None = None) -> Path:
-    """Scarica il contenuto di `url` in `dest` e restituisce il file da inviare
-    (il file singolo oppure uno ZIP se il post contiene più elementi).
+def download(url: str, dest: Path, max_size: int | None = None) -> list[Path]:
+    """Scarica il contenuto di `url` in `dest` e restituisce i file ottenuti.
     Con `max_size` ogni file viene compresso fino a stare in quel numero di byte."""
     url = validate_url(url)
     errors = []
@@ -204,7 +203,11 @@ def download(url: str, dest: Path, max_size: int | None = None) -> Path:
             files = [compress.fit(f, max_size) for f in files]
         except (compress.CompressionError, subprocess.TimeoutExpired) as exc:
             raise DownloadError(str(exc))
+    return files
 
+
+def bundle(files: list[Path], dest: Path) -> Path:
+    """Il file da inviare al browser: quello singolo, oppure uno ZIP se sono più di uno."""
     if len(files) == 1:
         return files[0]
 

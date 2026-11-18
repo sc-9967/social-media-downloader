@@ -54,6 +54,18 @@ docker build -t social-media-downloader .
 docker run --rm -p 8000:8000 social-media-downloader
 ```
 
+## Cartella dei download
+
+Di serie i file arrivano nella cartella Download del browser. Con **Scegli
+cartella…** si apre la finestra di scelta cartella del sistema operativo, sul PC
+dove gira l'app: da quel momento i file vengono salvati direttamente lì, uno per
+uno (niente ZIP), senza sovrascrivere quelli già presenti. **Usa Download del
+browser** torna al comportamento di serie.
+
+La scelta è salvata in `settings.local.json` (escluso da git). Il percorso si
+imposta solo da quella finestra: una pagina web non può indicarne uno a sua scelta,
+e l'app rifiuta le richieste che arrivano da altri siti.
+
 ## Contenuti che richiedono il login (facoltativo)
 
 Di serie l'app scarica come un utente anonimo: l'accesso fatto nel browser non

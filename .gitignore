@@ -5,3 +5,4 @@ __pycache__/
 .claude/
 cookies.txt
 *cookies*.txt
+settings.local.json

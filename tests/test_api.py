@@ -4,7 +4,7 @@ import zipfile
 import pytest
 from fastapi.testclient import TestClient
 
-from app import downloader
+from app import downloader, folder
 from app.downloader import DownloadError, validate_url
 from app.main import app
 
@@ -12,11 +12,12 @@ client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def no_cookies(monkeypatch, tmp_path):
-    # I test non devono dipendere da un cookies.txt o da variabili sul PC di chi li lancia.
+def isolated_settings(monkeypatch, tmp_path):
+    # I test non devono dipendere da cookie, variabili o cartella scelta sul PC di chi li lancia.
     monkeypatch.delenv("SMD_COOKIES_FILE", raising=False)
     monkeypatch.delenv("SMD_COOKIES_FROM_BROWSER", raising=False)
     monkeypatch.setattr(downloader, "DEFAULT_COOKIES_FILE", tmp_path / "assente.txt")
+    monkeypatch.setattr(folder, "SETTINGS_FILE", tmp_path / "settings.local.json")
 
 
 @pytest.mark.parametrize(
@@ -176,6 +177,45 @@ def test_telegram_photos_from_embed_widget(monkeypatch, tmp_path):
 def test_telegram_photos_ignores_other_sites(tmp_path):
     downloader._download_telegram_photos("https://www.instagram.com/p/abc/", tmp_path)
     assert list(tmp_path.iterdir()) == []
+
+
+def test_folder_defaults_to_browser_downloads():
+    assert client.get("/api/folder").json() == {"folder": None}
+
+
+def test_chosen_folder_receives_files_without_overwriting(monkeypatch, tmp_path):
+    target = tmp_path / "scaricati"
+    target.mkdir()
+    (target / "video.mp4").write_bytes(b"vecchio")
+    monkeypatch.setattr(folder, "pick_download_dir", lambda: target)
+    assert client.post("/api/folder/pick").json() == {"folder": str(target)}
+
+    def fake_ytdlp(url, dest):
+        (dest / "video.mp4").write_bytes(b"nuovo")
+
+    monkeypatch.setattr(downloader, "_download_with_ytdlp", fake_ytdlp)
+    res = client.post("/api/download", json={"url": "https://www.tiktok.com/@u/video/1"})
+    assert res.json() == {"folder": str(target), "saved": ["video (1).mp4"]}
+    assert (target / "video.mp4").read_bytes() == b"vecchio"
+    assert (target / "video (1).mp4").read_bytes() == b"nuovo"
+
+
+def test_cancelled_picker_keeps_current_folder(monkeypatch, tmp_path):
+    folder.set_download_dir(tmp_path)
+    monkeypatch.setattr(folder, "pick_download_dir", lambda: None)
+    assert client.post("/api/folder/pick").json() == {"folder": str(tmp_path)}
+
+
+def test_reset_and_missing_folder_fall_back_to_browser(tmp_path):
+    folder.set_download_dir(tmp_path)
+    assert client.delete("/api/folder").json() == {"folder": None}
+    folder.set_download_dir(tmp_path / "cancellata")
+    assert folder.get_download_dir() is None
+
+
+def test_cross_site_requests_are_rejected():
+    res = client.post("/api/folder/pick", headers={"Sec-Fetch-Site": "cross-site"})
+    assert res.status_code == 403
 
 
 def test_cookies_disabled_by_default():

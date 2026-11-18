@@ -47,6 +47,19 @@
       display: flex; align-items: flex-start; justify-content: space-between;
       gap: 12px; margin-top: 14px;
     }
+    .folder {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-top: 14px; font-size: .95rem; color: var(--muted);
+    }
+    .folder-path {
+      flex: 1 1 160px; min-width: 0; color: var(--text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    button.secondary {
+      padding: 6px 12px; font-size: .9rem; font-weight: 500; color: var(--text);
+      background: transparent; border: 1px solid var(--border);
+    }
+    button.secondary:hover:not(:disabled) { background: var(--bg); }
     .option {
       display: flex; align-items: center; gap: 8px;
       font-size: .95rem; color: var(--muted); cursor: pointer;
@@ -73,6 +86,12 @@
       <input id="url" type="url" required placeholder="https://www.tiktok.com/@utente/video/..." autocomplete="off">
       <button id="btn" type="submit">Scarica</button>
     </form>
+    <div class="folder">
+      <span>Salva in:</span>
+      <span id="folder-path" class="folder-path">cartella Download del browser</span>
+      <button type="button" id="pick" class="secondary">Scegli cartella…</button>
+      <button type="button" id="reset" class="secondary" hidden>Usa Download del browser</button>
+    </div>
     <div class="row">
       <label class="option">
         <input id="reduce" type="checkbox">
@@ -88,11 +107,48 @@
     const btn = document.getElementById("btn");
     const status = document.getElementById("status");
     const reduce = document.getElementById("reduce");
+    const folderPath = document.getElementById("folder-path");
+    const pick = document.getElementById("pick");
+    const reset = document.getElementById("reset");
 
     function setStatus(text, kind = "") {
       status.textContent = text;
       status.className = kind;
     }
+
+    async function errorDetail(res, fallback) {
+      const data = await res.json().catch(() => ({}));
+      return typeof data.detail === "string" ? data.detail : fallback;
+    }
+
+    function showFolder(folder) {
+      folderPath.textContent = folder || "cartella Download del browser";
+      folderPath.title = folder || "";
+      reset.hidden = !folder;
+    }
+
+    async function folderRequest(method, path) {
+      const res = await fetch(path, { method, headers: { "Content-Type": "application/json" } });
+      if (!res.ok) throw new Error(await errorDetail(res, "Errore con la cartella."));
+      showFolder((await res.json()).folder);
+    }
+
+    pick.addEventListener("click", async () => {
+      pick.disabled = true;
+      setStatus("Scegli la cartella nella finestra che si è aperta (può comparire dietro al browser)…");
+      try {
+        await folderRequest("POST", "/api/folder/pick");
+        setStatus("");
+      } catch (err) {
+        setStatus(err.message, "error");
+      } finally {
+        pick.disabled = false;
+      }
+    });
+
+    reset.addEventListener("click", () => folderRequest("DELETE", "/api/folder").catch((err) => setStatus(err.message, "error")));
+
+    folderRequest("GET", "/api/folder").catch(() => {});
 
     function filenameFrom(response) {
       const cd = response.headers.get("Content-Disposition") || "";
@@ -112,10 +168,11 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: input.value, reduce: reduce.checked }),
         });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          const detail = typeof data.detail === "string" ? data.detail : "Errore durante il download.";
-          throw new Error(detail);
+        if (!res.ok) throw new Error(await errorDetail(res, "Errore durante il download."));
+        if ((res.headers.get("Content-Type") || "").includes("application/json")) {
+          const data = await res.json();
+          setStatus(`Salvato in ${data.folder}: ${data.saved.join(", ")}`, "ok");
+          return;
         }
         const blob = await res.blob();
         const name = filenameFrom(res);
